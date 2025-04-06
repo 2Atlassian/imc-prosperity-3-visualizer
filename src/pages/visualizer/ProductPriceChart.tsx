@@ -1,6 +1,6 @@
 import Highcharts from 'highcharts';
 // Import specific series option types
-import type { SeriesLineOptions, PointOptionsObject } from 'highcharts';
+import type { SeriesLineOptions, PointOptionsObject } from 'highcharts'; // Keep these imports
 import { ReactNode } from 'react';
 import { ProsperitySymbol } from '../../models.ts';
 import { useStore } from '../../store.ts';
@@ -21,18 +21,14 @@ interface ActivityLogRow {
   fairPrice?: number; // Added fairPrice
 }
 
-// More specific type for the series we are creating in this chart
-// We know they are all line series for the purpose of having a 'data' array.
-// Using Highcharts.SeriesOptionsType directly is too broad here.
-type LineSeriesWithOptions = SeriesLineOptions & { data: PointOptionsObject[] };
+// REMOVED the unused 'LineSeriesWithOptions' type alias declaration
 
 export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode {
   const algorithm = useStore(state => state.algorithm)!;
   const activityLogs = (algorithm.activityLogs || []) as ActivityLogRow[];
 
-  // Initialize series array - TypeScript can infer the type partly,
-  // but we will access 'data' safely later.
-  const series: SeriesLineOptions[] = [ // Use SeriesLineOptions initially
+  // Initialize series array using SeriesLineOptions[]
+  const series: SeriesLineOptions[] = [
     { type: 'line', name: 'Bid 3', color: getBidColor(0.5), marker: { symbol: 'square' }, data: [] },
     { type: 'line', name: 'Bid 2', color: getBidColor(0.75), marker: { symbol: 'circle' }, data: [] },
     { type: 'line', name: 'Bid 1', color: getBidColor(1.0), marker: { symbol: 'triangle' }, data: [] },
@@ -51,16 +47,9 @@ export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode
 
     // Helper function to safely push data
     const pushData = (seriesIndex: number, value: number | undefined | null) => {
-      // Check if the value is valid
       if (value === undefined || value === null) return;
-
-      // Access the specific series object
       const targetSeries = series[seriesIndex];
-
-      // IMPORTANT: Check if 'data' exists and is an array before pushing
-      // Highcharts types can be complex; this provides runtime safety.
       if (targetSeries && Array.isArray(targetSeries.data)) {
-         // Now TypeScript should be happy as targetSeries.data is known to be an array
          targetSeries.data.push({ x: row.timestamp, y: value });
       }
     };
@@ -74,17 +63,15 @@ export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode
     pushData(3, row.midPrice);
 
     // Populate Fair Value (index 4)
-    pushData(4, row.fairPrice); // Pass the potentially optional fairPrice
+    pushData(4, row.fairPrice);
 
     // Populate Asks (indices 5, 6, 7)
     for (let i = 0; i < row.askPrices.length; i++) {
-      pushData(i + 5, row.askPrices[i]); // Use i + 5 index
+      pushData(i + 5, row.askPrices[i]);
     }
   }
 
-  // No need to sort if timestamps are already in order from logs
-
-  // Pass the correctly typed series array to the Chart component
+  // Pass the series array to the Chart component
+  // Cast back if Chart component props require the broader type
   return <Chart title={`${symbol} - Price`} series={series as Highcharts.SeriesOptionsType[]} />;
-  // We might need to cast back to the broader type expected by the Chart component prop if it expects SeriesOptionsType[]
 }
