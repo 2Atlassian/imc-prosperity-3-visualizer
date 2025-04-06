@@ -1,6 +1,6 @@
 import Highcharts from 'highcharts';
-// Import specific series option types
-import type { SeriesLineOptions, PointOptionsObject } from 'highcharts'; // Keep these imports
+// Import only the needed specific series option type
+import type { SeriesLineOptions } from 'highcharts'; // REMOVED PointOptionsObject
 import { ReactNode } from 'react';
 import { ProsperitySymbol } from '../../models.ts';
 import { useStore } from '../../store.ts';
@@ -20,8 +20,6 @@ interface ActivityLogRow {
   midPrice: number;
   fairPrice?: number; // Added fairPrice
 }
-
-// REMOVED the unused 'LineSeriesWithOptions' type alias declaration
 
 export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode {
   const algorithm = useStore(state => state.algorithm)!;
@@ -50,6 +48,7 @@ export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode
       if (value === undefined || value === null) return;
       const targetSeries = series[seriesIndex];
       if (targetSeries && Array.isArray(targetSeries.data)) {
+         // Pushing {x, y} object - type is inferred correctly here
          targetSeries.data.push({ x: row.timestamp, y: value });
       }
     };
