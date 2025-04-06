@@ -1,4 +1,6 @@
 import Highcharts from 'highcharts';
+// Import specific series option types
+import type { SeriesLineOptions, PointOptionsObject } from 'highcharts';
 import { ReactNode } from 'react';
 import { ProsperitySymbol } from '../../models.ts';
 import { useStore } from '../../store.ts';
@@ -9,89 +11,80 @@ export interface ProductPriceChartProps {
   symbol: ProsperitySymbol;
 }
 
-// Define an interface for the log row structure, assuming 'fairPrice' is added
-// You might need to adjust this based on how you actually add the fair price
-// to the activityLogs in the store.
+// Define the log row structure (adjust if needed)
 interface ActivityLogRow {
   product: ProsperitySymbol;
   timestamp: number;
   bidPrices: number[];
   askPrices: number[];
   midPrice: number;
-  fairPrice?: number; // Add the fairPrice property here (optional if it might not always exist)
-  // Add other properties from your logs if needed for type safety
+  fairPrice?: number; // Added fairPrice
 }
+
+// More specific type for the series we are creating in this chart
+// We know they are all line series for the purpose of having a 'data' array.
+// Using Highcharts.SeriesOptionsType directly is too broad here.
+type LineSeriesWithOptions = SeriesLineOptions & { data: PointOptionsObject[] };
 
 export function ProductPriceChart({ symbol }: ProductPriceChartProps): ReactNode {
   const algorithm = useStore(state => state.algorithm)!;
-
-  // Cast activityLogs to the more specific type
   const activityLogs = (algorithm.activityLogs || []) as ActivityLogRow[];
 
-  // 1. Add the 'Fair Value' series definition
-  const series: Highcharts.SeriesOptionsType[] = [
+  // Initialize series array - TypeScript can infer the type partly,
+  // but we will access 'data' safely later.
+  const series: SeriesLineOptions[] = [ // Use SeriesLineOptions initially
     { type: 'line', name: 'Bid 3', color: getBidColor(0.5), marker: { symbol: 'square' }, data: [] },
     { type: 'line', name: 'Bid 2', color: getBidColor(0.75), marker: { symbol: 'circle' }, data: [] },
     { type: 'line', name: 'Bid 1', color: getBidColor(1.0), marker: { symbol: 'triangle' }, data: [] },
     { type: 'line', name: 'Mid price', color: 'gray', dashStyle: 'Dash', marker: { symbol: 'diamond' }, data: [] },
-    // ADDED: Fair Value series definition (at index 4)
-    {
-      type: 'line',
-      name: 'Fair Value', // Name for the legend
-      color: 'purple', // Choose a distinct color
-      dashStyle: 'ShortDot', // Choose a dash style (optional)
-      marker: { enabled: true, symbol: 'cross' }, // Choose a marker (optional)
-      data: [], // Initialize empty data array
-    },
-    // Original Ask series start here, indices are now shifted by 1
-    { type: 'line', name: 'Ask 1', color: getAskColor(1.0), marker: { symbol: 'triangle-down' }, data: [] }, // Now index 5
-    { type: 'line', name: 'Ask 2', color: getAskColor(0.75), marker: { symbol: 'circle' }, data: [] }, // Now index 6
-    { type: 'line', name: 'Ask 3', color: getAskColor(0.5), marker: { symbol: 'square' }, data: [] }, // Now index 7
+    { type: 'line', name: 'Fair Value', color: 'purple', dashStyle: 'ShortDot', marker: { enabled: true, symbol: 'cross' }, data: [] },
+    { type: 'line', name: 'Ask 1', color: getAskColor(1.0), marker: { symbol: 'triangle-down' }, data: [] },
+    { type: 'line', name: 'Ask 2', color: getAskColor(0.75), marker: { symbol: 'circle' }, data: [] },
+    { type: 'line', name: 'Ask 3', color: getAskColor(0.5), marker: { symbol: 'square' }, data: [] },
   ];
 
-  // 2. Populate the data, including the new 'Fair Value' series
+  // Populate the data
   for (const row of activityLogs) {
     if (row.product !== symbol) {
       continue;
     }
 
-    // Populate Bids (indices 0, 1, 2 - unchanged)
-    for (let i = 0; i < row.bidPrices.length; i++) {
-      // Ensure data exists before pushing
-      if (row.bidPrices[i] !== undefined && row.bidPrices[i] !== null) {
-         (series[2 - i].data as Highcharts.PointOptionsObject[]).push({ x: row.timestamp, y: row.bidPrices[i] });
+    // Helper function to safely push data
+    const pushData = (seriesIndex: number, value: number | undefined | null) => {
+      // Check if the value is valid
+      if (value === undefined || value === null) return;
+
+      // Access the specific series object
+      const targetSeries = series[seriesIndex];
+
+      // IMPORTANT: Check if 'data' exists and is an array before pushing
+      // Highcharts types can be complex; this provides runtime safety.
+      if (targetSeries && Array.isArray(targetSeries.data)) {
+         // Now TypeScript should be happy as targetSeries.data is known to be an array
+         targetSeries.data.push({ x: row.timestamp, y: value });
       }
+    };
+
+    // Populate Bids (indices 0, 1, 2)
+    for (let i = 0; i < row.bidPrices.length; i++) {
+      pushData(2 - i, row.bidPrices[i]);
     }
 
-    // Populate Mid Price (index 3 - unchanged)
-    if (row.midPrice !== undefined && row.midPrice !== null) {
-        (series[3].data as Highcharts.PointOptionsObject[]).push({ x: row.timestamp, y: row.midPrice });
-    }
+    // Populate Mid Price (index 3)
+    pushData(3, row.midPrice);
 
+    // Populate Fair Value (index 4)
+    pushData(4, row.fairPrice); // Pass the potentially optional fairPrice
 
-    // ADDED: Populate Fair Value (at index 4)
-    // Check if fairPrice exists on the row before trying to push it
-    if (row.fairPrice !== undefined && row.fairPrice !== null) {
-      (series[4].data as Highcharts.PointOptionsObject[]).push({ x: row.timestamp, y: row.fairPrice });
-    }
-
-    // Populate Asks (indices 5, 6, 7 - shifted by 1)
+    // Populate Asks (indices 5, 6, 7)
     for (let i = 0; i < row.askPrices.length; i++) {
-       // Ensure data exists before pushing
-       if (row.askPrices[i] !== undefined && row.askPrices[i] !== null) {
-           // Use i + 5 now because we inserted Fair Value at index 4
-          (series[i + 5].data as Highcharts.PointOptionsObject[]).push({ x: row.timestamp, y: row.askPrices[i] });
-       }
+      pushData(i + 5, row.askPrices[i]); // Use i + 5 index
     }
   }
 
-  // Ensure data arrays are sorted by timestamp if necessary (Highcharts usually handles this if x values are sequential)
-  // series.forEach(s => {
-  //   if (s.data) {
-  //     (s.data as Highcharts.PointOptionsObject[]).sort((a, b) => (a.x || 0) - (b.x || 0));
-  //   }
-  // });
+  // No need to sort if timestamps are already in order from logs
 
-
-  return <Chart title={`${symbol} - Price`} series={series} />;
+  // Pass the correctly typed series array to the Chart component
+  return <Chart title={`${symbol} - Price`} series={series as Highcharts.SeriesOptionsType[]} />;
+  // We might need to cast back to the broader type expected by the Chart component prop if it expects SeriesOptionsType[]
 }
