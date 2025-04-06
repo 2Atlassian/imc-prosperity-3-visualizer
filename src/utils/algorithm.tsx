@@ -249,7 +249,7 @@ function getAlgorithmData(logLines: string[]): AlgorithmDataRow[] {
              }
 
 
-            rows.push(decompressDataRow(compressedDataRow, nextSandboxLogs));
+            rows.push(decompressDataRow(compressedDataRow as CompressedAlgorithmDataRow, nextSandboxLogs));
         } catch (err) {
             console.warn(`Failed to parse lambdaLog line ${i + 1}. Maybe truncated or invalid JSON? Line:`, line);
             console.error('Parsing error:', err);
