@@ -34,6 +34,7 @@ export interface ActivityLogRow {
   askVolumes: number[];
   midPrice: number;
   profitLoss: number;
+  fairPrice?: number;
 }
 
 export interface Listing {
